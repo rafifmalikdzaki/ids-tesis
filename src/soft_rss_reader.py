@@ -369,8 +369,7 @@ def main():
     parser.add_argument('-s', '--stats-interval', type=int, default=10,
                        help='Statistics display interval in seconds (default: 10)')
     parser.add_argument('-o', '--output', help='Save state to file')
-    parser.add_argument('--load-object', help='Load pre-compiled XDP object file')
-
+  
     args = parser.parse_args()
 
     # Check if interface exists
@@ -384,10 +383,7 @@ def main():
 
     reader = SoftRSSReader(args.interface, args.buckets)
 
-    if args.load_object:
-        print(f"Note: --load-object option specified but using embedded BPF program")
-        print(f"To use pre-compiled object, modify the script to load from file")
-
+    
     return reader.run(args.stats_interval, args.output)
 
 

@@ -15,8 +15,6 @@ import signal
 import argparse
 from collections import defaultdict, deque
 from datetime import datetime
-from threading import Thread, Lock
-import uuid
 
 try:
     from bcc import BPF
@@ -173,7 +171,6 @@ class ArgusRSSManager:
         # Flow tracking
         self.bucket_flows = defaultdict(set)
         self.flow_buckets = {}  # flow_key -> bucket_id
-        self.lock = Lock()
 
         # Statistics
         self.stats = {
@@ -217,29 +214,28 @@ class ArgusRSSManager:
         flow_key = f"{src_ip}:{src_port}-{dst_ip}:{dst_port}-{proto}"
         bucket_id = event.bucket
 
-        with self.lock:
-            # Track flow assignment
-            if flow_key not in self.flow_buckets:
-                self.flow_buckets[flow_key] = bucket_id
-                self.bucket_flows[bucket_id].add(flow_key)
-                self.stats['total_flows'] += 1
-                self.stats['bucket_counts'][bucket_id] += 1
+      # Track flow assignment
+        if flow_key not in self.flow_buckets:
+            self.flow_buckets[flow_key] = bucket_id
+            self.bucket_flows[bucket_id].add(flow_key)
+            self.stats['total_flows'] += 1
+            self.stats['bucket_counts'][bucket_id] += 1
 
-                # Add flow filter to Argus instance
-                argus = self.argus_instances[bucket_id]
-                argus.add_flow_filter(src_ip, dst_ip, src_port, dst_port, proto)
+            # Add flow filter to Argus instance
+            argus = self.argus_instances[bucket_id]
+            argus.add_flow_filter(src_ip, dst_ip, src_port, dst_port, proto)
 
-                # Restart Argus if it's not running to pick up new filter
-                if not argus.is_running():
-                    print(f"Restarting Argus bucket {bucket_id} for new flow filters")
-                    argus.start()
-                    self.stats['argus_restarts'] += 1
+            # Restart Argus if it's not running to pick up new filter
+            if not argus.is_running():
+                print(f"Restarting Argus bucket {bucket_id} for new flow filters")
+                argus.start()
+                self.stats['argus_restarts'] += 1
 
-            # Print assignment
-            if event.packet_count % 500 == 0:  # Print every 500 packets
-                timestamp = datetime.now().strftime("%H:%M:%S")
-                print(f"[{timestamp}] Flow {flow_key} → Bucket {bucket_id} "
-                      f"({event.packet_count} packets)")
+        # Print assignment
+        if event.packet_count % 500 == 0:  # Print every 500 packets
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"[{timestamp}] Flow {flow_key} → Bucket {bucket_id} "
+                  f"({event.packet_count} packets)")
 
     def start_all_argus(self):
         """Start all Argus instances"""
